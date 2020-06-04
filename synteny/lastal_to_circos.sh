@@ -1,20 +1,30 @@
 #!/bin/bash
 
-# This script takes a lastal output file and makes it into a compatible file for circos
+# This script takes a lastal output file and plots circos plots for each chromosome separately
+# Filtering steps: 
+## 1. At least 100kb and 1 % of scaffold must align to each chromosome to assign the scaffold to it. 
+## 2. Then 1 Mb (doesn't make sense, will change it)
 
-# CIRCOS TEMPLATE FILE
-circos_temp="../neosexchromosome/intermediate/satsuma_warbler_gt_with_mt/circos_100kb_1_perc/conf_circos_template.50kb.labelFix.conf"
 
-circos_temp="../neosexchromosome/intermediate/satsuma_warbler_gt_with_mt/circos_100kb_1_perc/conf_circos_template.50kb.conf2"
-
+# Modify these
 lastal="intermediate/lastal_ZF/AlaArv_ref_AlaArv_EDI/AlaArv_align_converted"
 genome_fai="data/external_raw/genome/GCA_902810485.1_skylark_genome_genomic.fasta.fai"
-outdir="intermediate/lastal_ZF/circos_plotting"
-target="zf"
 query="AlaArv"
+
+lastal="intermediate/lastal_ZF/CisJun_ref_CisJun_B10K/CisJun_align_converted"
+genome_fai="data/external_raw/genome/B10K-DU-002-30.genomic.fasta.fai"
+query="CisJun"
+
+# Keep these the same
+target="zf"
+outdir="intermediate/lastal_ZF/circos_plotting"
+#circos_temp="../neosexchromosome/intermediate/satsuma_warbler_gt_with_mt/circos_100kb_1_perc/conf_circos_template.50kb.labelFix.conf"
+#circos_temp="../neosexchromosome/intermediate/satsuma_warbler_gt_with_mt/circos_100kb_1_perc/conf_circos_template.50kb.conf2"
 mkdir $outdir
+
+# CIRCOS TEMPLATE FILE
 circos_temp="conf_circos_template.50kb.labelFix.conf"
-cp code/${circos_temp} ${outdir}
+#cp code/${circos_temp} ${outdir}
 
 source activate neosc
 
@@ -59,9 +69,9 @@ cat $genome_fai | cut -f 1,2 | sed 's/Contig//' | awk '{print "chr","-","'"$quer
 ### Parallel bundlelinks - 50kbp and 5kbp
 cd ${outdir}
 
-find . -name "*_links.txt" | grep -v bundles |  sed 's|./||'> links.list
+find . -name "*_links.txt" | grep $query | grep -v bundles |  sed 's|./||'> ${query}_links.list
 
-cat links.list | sed 's/.txt//' | while read links ; do ~/bin/circos-tools-0.23/tools/bundlelinks/bin/bundlelinks -max_gap 50000 -min_bundle_size 50000 -strict -links $links.txt > $links.bundles.txt ; done
+cat ${query}_links.list | sed 's/.txt//' | while read links ; do ~/bin/circos-tools-0.23/tools/bundlelinks/bin/bundlelinks -max_gap 50000 -min_bundle_size 50000 -strict -links $links.txt > $links.bundles.txt ; done
 
 
 
