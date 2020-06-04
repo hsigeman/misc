@@ -5,6 +5,8 @@
 # CIRCOS TEMPLATE FILE
 circos_temp="../neosexchromosome/intermediate/satsuma_warbler_gt_with_mt/circos_100kb_1_perc/conf_circos_template.50kb.labelFix.conf"
 
+circos_temp="../neosexchromosome/intermediate/satsuma_warbler_gt_with_mt/circos_100kb_1_perc/conf_circos_template.50kb.conf2"
+
 lastal="intermediate/lastal_ZF/AlaArv_ref_AlaArv_EDI/AlaArv_align_converted"
 genome_fai="data/external_raw/genome/GCA_902810485.1_skylark_genome_genomic.fasta.fai"
 outdir="intermediate/lastal_ZF/circos_plotting"
@@ -13,6 +15,8 @@ query="AlaArv"
 mkdir $outdir
 circos_temp="conf_circos_template.50kb.labelFix.conf"
 cp code/${circos_temp} ${outdir}
+
+source activate neosc
 
 # Create comparative species karyotype file
 cat data/external_raw/genome/Taeniopygia_guttata.taeGut3.2.4.dna.toplevel_final.fasta.fai | awk '{ print "chr","-","zf"$1,$1,"0",$2,"red"}' > ${outdir}/${target}_karyotype.txt
@@ -28,18 +32,56 @@ cat $lastal | awk '{print $1,$10"_CHR_"$14}' | awk '{a[$2]+=$1} END {OFS="\t"; f
 
 
 # Only print those where i) matches to zebra finch is larger than 1% and scaffold match is > 100kb. 
-cat ${outdir}/${query}_${target}_scaffold_chr_prop_assignment.out | awk '$3 > 100000 && $5 > 0.01 {print $0}' | sort -k2,2g > ${outdir}/${query}_${target}_scaffold_chr_prop_assignment_100kb.out
+cat ${outdir}/${query}_${target}_scaffold_chr_prop_assignment.out | awk '$3 > 100000 && $5 > 0.01 {print $0}' | sort -k2,2g > ${outdir}/${query}_${target}_scaffold_chr_prop_assignment_100kb.out 
 
 
 # Write to a circos links file
-awk 'NR==FNR{c[$1$2]++;next};c[$10$14] > 0' ${outdir}/${query}_${target}_scaffold_chr_prop_assignment_100kb.out $lastal | awk '$1>200 {print "'"$query"'"$10,$12,$13,"'"$target"'"$14,$16,$17,$1}' > ${outdir}/${query}_${target}_circos_links.txt
+awk 'NR==FNR{c[$1$2]++;next};c[$10$14] > 0' ${outdir}/${query}_${target}_scaffold_chr_prop_assignment_100kb.out $lastal | awk '{print "'"$query"'"$10,$12,$13,"'"$target"'"$14,$16,$17}' > ${outdir}/${query}_${target}_circos_links_allChr.txt
+
+
+# Filter for scaffolds that align with more than 1 Mb to this chromosome
+cat ${outdir}/${query}_${target}_circos_links_allChr.txt | awk '{print $3-$2,$1"_CHR_"$4}' | awk '{a[$2]+=$1} END {OFS="\t"; for(i in a) print a[i], i}' | awk '$1>1000000 {print $2}' | sed 's/_CHR_/\t/' > ${outdir}/${query}_${target}_link_filter.list
+
+awk 'NR==FNR{c[$1$2]++;next};c[$1$4] > 0' ${outdir}/${query}_${target}_link_filter.list ${outdir}/${query}_${target}_circos_links_allChr.txt > ${outdir}/${query}_${target}_circos_links_allChr_filter.txt
 
 
 # And for each chromosome separately
 cd ${outdir}
-awk '{print >> "'"$query"'""_""'"$target"'""_"$4"_links.txt"}' ${query}_${target}_circos_links.txt
+rm ${query}_${target}_*_links.txt
+awk '{print >> "'"$query"'""_""'"$target"'""_"$4"_links.txt"}' ${query}_${target}_circos_links_allChr_filter.txt
 cd ../../../
 
 
 # Make circos karyotype file
-cat $genome_fai | cut -f 1,2 | sed 's/Contig//' | awk '{print "chr","-","grw"$1,$1,"0",$2,"blue"}' > ${outdir}/${query}_karyotype.txt
+cat $genome_fai | cut -f 1,2 | sed 's/Contig//' | awk '{print "chr","-","'"$query"'"$1,$1,"0",$2,"blue"}' > ${outdir}/${query}_karyotype.txt
+
+
+### Parallel bundlelinks - 50kbp and 5kbp
+cd ${outdir}
+
+find . -name "*_links.txt" | grep -v bundles |  sed 's|./||'> links.list
+
+cat links.list | sed 's/.txt//' | while read links ; do ~/bin/circos-tools-0.23/tools/bundlelinks/bin/bundlelinks -max_gap 50000 -min_bundle_size 50000 -strict -links $links.txt > $links.bundles.txt ; done
+
+
+
+#############################################################
+# 100kb - For automatic scaffold order and colours
+
+ls | grep bundles.txt | sed 's/_links.bundles.txt//' | sed "s/${query}_${target}_//" | while read chr ; do cat ${query}_${target}_${chr}_links.bundles.txt | cut -f 1 -d " " | sort | uniq | tac - | tr '\n' ';' | sed 's/;$//' | awk '{print "'"$chr"'"";"$0}' | while read line ; do cat circos_template.conf | sed -e "s/CHR/$chr/" | sed -e "s/chromosomes = LINE/chromosomes = $line/" ; done | sed "s/TARGET/${target}/" | sed "s/QUERY/${query}/"  > ${query}_${target}_${chr}.conf ; done
+
+
+# Bash line for finding the middle of the largest chunk of alignment and order the grw scaffolds in the reverse order
+ls | grep bundles.txt | sed 's/_links.bundles.txt//' | sed "s/${query}_${target}_//" | while read chr ; do cat ${query}_${target}_${chr}_links.bundles.txt | sed 's/ /\t/g' | cut -f 1 | sort | uniq | while read scaff ; do cat ${query}_${target}_${chr}_links.bundles.txt | sed 's/ /\t/g' |  cut -f 1-3 | awk '$1=="'"$scaff"'" { print $1,$3-$2,$2 }' | sed 's/ /\t/g' | sort -k2,2gr | head -n 1 ; done | while read scaff length start ; do cat ${query}_${target}_${chr}_links.bundles.txt | sed 's/ /\t/g' | awk '{ if($1=="'"$scaff"'" && $2=="'"$start"'" && $6>$5) printf "%s %.0f %.0f %.0f\n", $1,$5,$6,$5+(($6-$5)/2) ; else if ($1=="'"$scaff"'" && $2=="'"$start"'" && $5>$6) printf "%s %.0f %.0f %.0f\n", $1,$5,$6,$6+(($5-$6)/2) }'; done | sed 's/ /\t/g' | sort -k4,4gr | cut -f 1 | tr -d "\n" | sed "s/${query}/;${query}/g" | awk '{print "'"$chr"'"$0}' | while read line ; do cat ${query}_${target}_${chr}.conf | sed -e "s/chromosomes_order = LINE/chromosomes_order = $line/" ; done > ${query}_${target}_${chr}.conf2 ; done
+
+
+# Assign different colors to the different scaffolds - This one also takes the scaffold order into account
+ls | grep bundles.txt | sed 's/_links.bundles.txt//' | sed "s/${query}_${target}_//" | while read chr; do cat ${query}_${target}_${chr}_links.bundles.txt | sed 's/ /\t/g' | cut -f 1 | sort | uniq | while read scaff ; do cat ${query}_${target}_${chr}_links.bundles.txt | sed 's/ /\t/g' |  cut -f 1-3 | awk '$1=="'"$scaff"'" { print $1,$3-$2,$2 }' | sed 's/ /\t/g' | sort -k2,2gr | head -n 1 ; done | while read scaff length start ; do cat ${query}_${target}_${chr}_links.bundles.txt | sed 's/ /\t/g' | awk '{ if($1=="'"$scaff"'" && $2=="'"$start"'" && $6>$5) printf "%s %.0f %.0f %.0f\n", $1,$5,$6,$5+(($6-$5)/2) ; else if ($1=="'"$scaff"'" && $2=="'"$start"'" && $5>$6) printf "%s %.0f %.0f %.0f\n", $1,$5,$6,$6+(($5-$6)/2) }'; done | sed 's/ /\t/g' | sort -k4,4gr | cut -f 1 | cat -n | sed 's/ /\t/g' | while read nr scaff ; do cat ${query}_${target}_${chr}_links.bundles.txt | sed 's/ /\t/g' | awk '$1=="'"$scaff"'" { print $0"color=""'"$nr"'" }' ; done > ${query}_${target}_${chr}_links.bundles.color.txt ; done
+
+ls | grep bundles.color.txt | sed 's/_links.bundles.color.txt//' | sed "s/${query}_${target}_//" | while read chr ; do cat ${query}_${target}_${chr}_links.bundles.color.txt | cut -f 1 | sort | uniq | while read scaff ; do cat ${query}_karyotype.txt | awk '$3=="'"$scaff"'" {print}' ; done > ${query}_karyotype_${chr}.txt ; done
+
+
+
+mkdir plots
+cat ${target}_karyotype.txt | cut -d " " -f 3 | while read chr; do circos -conf ${query}_${target}_${chr}.conf2 ; mv circos.png plots/${query}_${target}_${chr}.png ; mv circos.svg plots/${query}_${target}_${chr}.svg; done
+
