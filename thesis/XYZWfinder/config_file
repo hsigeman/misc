@@ -1,0 +1,24 @@
+samples:
+    SRR9655168_WGS_of_Alouatta_palliata_S173 : SRR9655168_WGS_of_Alouatta_palliata_S173
+    SRR9655169_WGS_of_Alouatta_palliata_S145 : SRR9655169_WGS_of_Alouatta_palliata_S145
+    SRR9655170_WGS_of_Alouatta_palliata_S608 : SRR9655170_WGS_of_Alouatta_palliata_S608
+    SRR9655171_WGS_of_Alouatta_palliata_S618 : SRR9655171_WGS_of_Alouatta_palliata_S618
+species: alouatta
+heterogametic: 
+    SRR9655170_WGS_of_Alouatta_palliata_S608 : SRR9655170_WGS_of_Alouatta_palliata_S608
+    SRR9655171_WGS_of_Alouatta_palliata_S618 : SRR9655171_WGS_of_Alouatta_palliata_S618
+homogametic: 
+    SRR9655168_WGS_of_Alouatta_palliata_S173 : SRR9655168_WGS_of_Alouatta_palliata_S173
+    SRR9655169_WGS_of_Alouatta_palliata_S145 : SRR9655169_WGS_of_Alouatta_palliata_S145
+fastq: path/to/fastq/
+ref_dir: path/to/study/species/reference/genome/
+ref_name: AloPal_v1
+synteny_dir: path/to/lastdb/database/myHSdb
+synteny_species: HS
+chr_file: data/meta/alouatta.chr.txt
+chr_highlight_file: data/meta/alouatta.sexChr.txt
+edit_distance:
+    0.0 : 0.0
+    0.2 : 0.2
+    all : all
+minSizeScaffold: "10000"
